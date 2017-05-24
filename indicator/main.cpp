@@ -115,5 +115,7 @@ int main(int argc, char** argv)
 
     refreshMenu();
 
+    app.setQuitOnLastWindowClosed(false);
+
     return app.exec();
 }

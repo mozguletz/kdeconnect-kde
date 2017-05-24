@@ -21,6 +21,7 @@
 #include "deviceindicator.h"
 #include <QFileDialog>
 #include <KLocalizedString>
+#include <KCMUtils/KCMultiDialog>
 
 class BatteryAction : public QAction
 {
@@ -100,6 +101,15 @@ DeviceIndicator::DeviceIndicator(DeviceDbusInterface* device)
         QDBusConnection::sessionBus().call(msg);
     });
     setWhenAvailable(device->hasPlugin("kdeconnect_share"), [sendFile](bool available) { sendFile->setVisible(available); }, this);
+
+    auto configure = addAction(i18n("Configure..."));
+    QObject::connect(configure, &QAction::triggered, this, &DeviceIndicator::openDialog);
 }
+
+void DeviceIndicator::openDialog()
+{
+    QProcess::startDetached("kcmshell5", {"kdeconnect"});
+}
+
 
 #include "deviceindicator.moc"
