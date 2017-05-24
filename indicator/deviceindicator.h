@@ -24,8 +24,6 @@
 #include <QMenu>
 #include "interfaces/dbusinterfaces.h"
 
-class KCMultiDialog;
-
 class DeviceIndicator : public QMenu
 {
     Q_OBJECT
@@ -36,9 +34,7 @@ class DeviceIndicator : public QMenu
         void setText(const QString &text) { setTitle(text); }
 
     private:
-        void openDialog();
         DeviceDbusInterface* m_device;
-        QPointer<KCMultiDialog> m_dialog;
 };
 
 #endif // DEVICEINDICATOR_H
