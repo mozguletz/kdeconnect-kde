@@ -54,6 +54,7 @@
          <font>
           <weight>50</weight>
           <bold>false</bold>
+          <kerning>true</kerning>
          </font>
         </property>
         <property name="toolTip">
@@ -93,6 +94,22 @@
         </property>
         <property name="text">
          <string>Synchronize icons</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QCheckBox" name="check_locked">
+        <property name="font">
+         <font>
+          <weight>50</weight>
+          <bold>false</bold>
+         </font>
+        </property>
+        <property name="toolTip">
+         <string>Send notification only when the station is locked.\</string>
+        </property>
+        <property name="text">
+         <string>Send only when locked</string>
         </property>
        </widget>
       </item>

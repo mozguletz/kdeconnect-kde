@@ -60,5 +60,6 @@ private Q_SLOTS:
 
 private:
     void setTranslatedAppName();
+    bool isScreenLocked();
     QString mTranslatedAppName;
 };

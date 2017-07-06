@@ -52,6 +52,7 @@ SendNotificationsConfig::SendNotificationsConfig(QWidget *parent, const QVariant
     connect(m_ui->spin_urgency, SIGNAL(editingFinished()), this, SLOT(changed()));
     connect(m_ui->check_body, SIGNAL(toggled(bool)), this, SLOT(changed()));
     connect(m_ui->check_icons, SIGNAL(toggled(bool)), this, SLOT(changed()));
+    connect(m_ui->check_locked, SIGNAL(toggled(bool)), this, SLOT(changed()));
 
     connect(appModel, SIGNAL(applicationsChanged()), this, SLOT(changed()));
 
@@ -70,6 +71,7 @@ void SendNotificationsConfig::defaults()
     m_ui->spin_urgency->setValue(0);
     m_ui->check_body->setChecked(true);
     m_ui->check_icons->setChecked(true);
+    m_ui->check_locked->setChecked(false);
     Q_EMIT changed(true);
 }
 
@@ -94,8 +96,11 @@ void SendNotificationsConfig::load()
     m_ui->check_body->setChecked(body);
     bool icons = config()->get("generalSynchronizeIcons", true);
     m_ui->check_icons->setChecked(icons);
+    bool locked = config()->get("sendOnlyLocked", false);
+    m_ui->check_locked->setChecked(locked);
     int urgency = config()->get("generalUrgency", 0);
     m_ui->spin_urgency->setValue(urgency);
+
 
     loadApplications();
     Q_EMIT changed(false);
@@ -106,6 +111,7 @@ void SendNotificationsConfig::save()
     config()->set("generalPersistent", m_ui->check_persistent->isChecked());
     config()->set("generalIncludeBody", m_ui->check_body->isChecked());
     config()->set("generalSynchronizeIcons", m_ui->check_icons->isChecked());
+    config()->set("sendOnlyLocked", m_ui->check_locked->isChecked());
     config()->set("generalUrgency", m_ui->spin_urgency->value());
 
     QVariantList list;
