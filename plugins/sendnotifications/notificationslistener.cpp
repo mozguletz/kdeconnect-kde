@@ -21,6 +21,7 @@
 #include <QtDBus/QDBusConnection>
 #include <QtDBus/QDBusInterface>
 #include <QtDBus/QDBusArgument>
+#include <QtDBus/QDBusReply>
 #include <QtDebug>
 #include <QLoggingCategory>
 #include <QStandardPaths>
@@ -268,7 +269,25 @@ uint NotificationsListener::Notify(const QString &appName, uint replacesId,
             np.setPayload(iconSource, iconSource->size());
     }
 
-    mPlugin->sendPackage(np);
+    if (mPlugin->config()->get("sendOnlyLocked", false)) {
+        if (isScreenLocked()) {
+            mPlugin->sendPackage(np);
+        }
+    } else {
+        mPlugin->sendPackage(np);
+    }
 
     return (replacesId > 0 ? replacesId : id);
+}
+
+
+bool NotificationsListener::isScreenLocked() {
+    QDBusInterface screensaver("org.freedesktop.ScreenSaver", "/ScreenSaver", "org.freedesktop.ScreenSaver");
+    QDBusReply<bool> reply = screensaver.call("GetActive");
+
+    if (reply.isValid()) {
+        return reply.value();
+    }
+
+    return false;
 }
