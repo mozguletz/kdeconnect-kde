@@ -20,6 +20,7 @@
 
 #include "mounter.h"
 
+#include <unistd.h>
 #include <QDir>
 #include <QDebug>
 
@@ -37,25 +38,24 @@ Mounter::Mounter(SftpPlugin* sftp)
     , m_started(false)
 {
 
-    connect(m_sftp, SIGNAL(packageReceived(NetworkPackage)), this, SLOT(onPakcageReceived(NetworkPackage)));
+    connect(m_sftp, &SftpPlugin::packageReceived, this, &Mounter::onPakcageReceived);
 
-    connect(&m_connectTimer, SIGNAL(timeout()), this, SLOT(onMountTimeout()));
+    connect(&m_connectTimer, &QTimer::timeout, this, &Mounter::onMountTimeout);
 
-    connect(this, SIGNAL(mounted()), &m_connectTimer, SLOT(stop()));
-    connect(this, SIGNAL(failed(QString)), &m_connectTimer, SLOT(stop()));
+    connect(this, &Mounter::mounted, &m_connectTimer, &QTimer::stop);
+    connect(this, &Mounter::failed, &m_connectTimer, &QTimer::stop);
 
     m_connectTimer.setInterval(10000);
     m_connectTimer.setSingleShot(true);
 
-    QTimer::singleShot(0, this, SLOT(start()));
+    QTimer::singleShot(0, this, &Mounter::start);
     qCDebug(KDECONNECT_PLUGIN_SFTP) << "Created mounter";
 }
 
 Mounter::~Mounter()
 {
     qCDebug(KDECONNECT_PLUGIN_SFTP) << "Destroy mounter";
-    //FIXME: We don't unmount becuase it crashes if we try to unmount while the filesystem is being used. Potential memory leak.
-    //unmount();
+    unmount(false);
 }
 
 bool Mounter::wait()
@@ -64,21 +64,21 @@ bool Mounter::wait()
     {
         return true;
     }
-    
+
     qCDebug(KDECONNECT_PLUGIN_SFTP) << "Starting loop to wait for mount";
-    
+
     MountLoop loop;
-    connect(this, SIGNAL(mounted()), &loop, SLOT(successed()));
-    connect(this, SIGNAL(failed(QString)), &loop, SLOT(failed()));
+    connect(this, &Mounter::mounted, &loop, &MountLoop::successed);
+    connect(this, &Mounter::failed, &loop, &MountLoop::failed);
     return loop.exec();
 }
 
 void Mounter::onPakcageReceived(const NetworkPackage& np)
 {
-    if (np.get<bool>("stop", false))
+    if (np.get<bool>(QStringLiteral("stop"), false))
     {
         qCDebug(KDECONNECT_PLUGIN_SFTP) << "SFTP server stopped";
-        unmount();
+        unmount(false);
         return;
     }
 
@@ -96,46 +96,49 @@ void Mounter::onPakcageReceived(const NetworkPackage& np)
    *    Q_EMIT mounted();
    */
 
-    unmount();
+    unmount(false);
 
-    m_proc = new KProcess(this);
+    m_proc = new KProcess();
     m_proc->setOutputChannelMode(KProcess::MergedChannels);
 
-    connect(m_proc, SIGNAL(started()), SLOT(onStarted()));
+    connect(m_proc, &QProcess::started, this, &Mounter::onStarted);
     connect(m_proc, SIGNAL(error(QProcess::ProcessError)), SLOT(onError(QProcess::ProcessError)));
     connect(m_proc, SIGNAL(finished(int,QProcess::ExitStatus)), SLOT(onFinished(int,QProcess::ExitStatus)));
 
     QDir().mkpath(m_mountPoint);
 
-    const QString program = "sshfs";
+    const QString program = QStringLiteral("sshfs");
 
     QString path;
-    if (np.has("multiPaths")) path = '/';
-    else path = np.get<QString>("path");
+    if (np.has(QStringLiteral("multiPaths"))) path = '/';
+    else path = np.get<QString>(QStringLiteral("path"));
 
     const QStringList arguments = QStringList()
-        << QString("%1@%2:%3")
-            .arg(np.get<QString>("user"))
-            .arg(np.get<QString>("ip"))
-            .arg(path)
+        << QStringLiteral("%1@%2:%3").arg(
+            np.get<QString>(QStringLiteral("user")),
+            np.get<QString>(QStringLiteral("ip")),
+            path)
         << m_mountPoint
-        << "-p" << np.get<QString>("port")
-        << "-f"
-        << "-F" << "/dev/null" //Do not use ~/.ssh/config
-        << "-o" << "IdentityFile=" + KdeConnectConfig::instance()->privateKeyPath()
-        << "-o" << "StrictHostKeyChecking=no" //Do not ask for confirmation because it is not a known host
-        << "-o" << "UserKnownHostsFile=/dev/null" //Prevent storing as a known host
-        << "-o" << "HostKeyAlgorithms=ssh-dss" //https://bugs.kde.org/show_bug.cgi?id=351725
-        << "-o" << "password_stdin"
+        << QStringLiteral("-p") << np.get<QString>(QStringLiteral("port"))
+        << QStringLiteral("-f")
+        << QStringLiteral("-F") << QStringLiteral("/dev/null") //Do not use ~/.ssh/config
+        << QStringLiteral("-o") << "IdentityFile=" + KdeConnectConfig::instance()->privateKeyPath()
+        << QStringLiteral("-o") << QStringLiteral("StrictHostKeyChecking=no") //Do not ask for confirmation because it is not a known host
+        << QStringLiteral("-o") << QStringLiteral("UserKnownHostsFile=/dev/null") //Prevent storing as a known host
+        << QStringLiteral("-o") << QStringLiteral("HostKeyAlgorithms=ssh-dss") //https://bugs.kde.org/show_bug.cgi?id=351725
+        << QStringLiteral("-o") << QStringLiteral("uid=") + QString::number(getuid())
+        << QStringLiteral("-o") << QStringLiteral("gid=") + QString::number(getgid())
+        << QStringLiteral("-o") << QStringLiteral("ServerAliveInterval=30")
+        << QStringLiteral("-o") << QStringLiteral("password_stdin")
         ;
 
     m_proc->setProgram(program, arguments);
 
-    qCDebug(KDECONNECT_PLUGIN_SFTP) << "Starting process: " << m_proc->program().join(" ");
+    qCDebug(KDECONNECT_PLUGIN_SFTP) << "Starting process: " << m_proc->program().join(QStringLiteral(" "));
     m_proc->start();
 
     //qCDebug(KDECONNECT_PLUGIN_SFTP) << "Passing password: " << np.get<QString>("password").toLatin1();
-    m_proc->write(np.get<QString>("password").toLatin1());
+    m_proc->write(np.get<QString>(QStringLiteral("password")).toLatin1());
     m_proc->write("\n");
 
 }
@@ -148,11 +151,13 @@ void Mounter::onStarted()
 
     //m_proc->setStandardOutputFile("/tmp/kdeconnect-sftp.out");
     //m_proc->setStandardErrorFile("/tmp/kdeconnect-sftp.err");
-    connect(m_proc, &KProcess::readyReadStandardError, [this]() {
-        qCDebug(KDECONNECT_PLUGIN_SFTP) << "stderr: " << m_proc->readAll();
+
+    auto proc = m_proc;
+    connect(m_proc, &KProcess::readyReadStandardError, [proc]() {
+        qCDebug(KDECONNECT_PLUGIN_SFTP) << "stderr: " << proc->readAll();
     });
-    connect(m_proc, &KProcess::readyReadStandardOutput, [this]() {
-        qCDebug(KDECONNECT_PLUGIN_SFTP) << "stdout:" << m_proc->readAll();
+    connect(m_proc, &KProcess::readyReadStandardOutput, [proc]() {
+        qCDebug(KDECONNECT_PLUGIN_SFTP) << "stdout:" << proc->readAll();
     });
 }
 
@@ -178,8 +183,8 @@ void Mounter::onFinished(int exitCode, QProcess::ExitStatus exitStatus)
         qCDebug(KDECONNECT_PLUGIN_SFTP) << "Process failed (exit code:" << exitCode << ")";
         Q_EMIT failed(i18n("Error when accessing to filesystem"));
     }
-    
-    unmount();
+
+    unmount(true);
 }
 
 void Mounter::onMountTimeout()
@@ -192,22 +197,38 @@ void Mounter::start()
 {
     NetworkPackage np(PACKAGE_TYPE_SFTP_REQUEST, {{"startBrowsing", true}});
     m_sftp->sendPackage(np);
-    
+
     m_connectTimer.start();
 }
 
-void Mounter::unmount()
+void Mounter::unmount(bool finished)
 {
     qCDebug(KDECONNECT_PLUGIN_SFTP) << "Unmount" << m_proc;
     if (m_proc)
     {
-        auto toDestroy = m_proc;
-        m_proc = nullptr; //So we don't reenter this code path when onFinished gets called
-        toDestroy->kill();
-        delete toDestroy;
+        if (!finished)
+        {
+            //Process is still running, we want to stop it
+            //But when the finished signal come, we might have already gone.
+            //Disconnect everything.
+            m_proc->disconnect();
+            m_proc->kill();
+
+            auto proc = m_proc;
+            m_proc = nullptr;
+            connect(proc, static_cast<void(QProcess::*)(int, QProcess::ExitStatus)>(&QProcess::finished),
+                [proc]() {
+                    qCDebug(KDECONNECT_PLUGIN_SFTP) << "Free" << proc;
+                    proc->deleteLater();
+            });
+            Q_EMIT unmounted();
+        }
+        else
+            m_proc->deleteLater();
+
         //Free mount point (won't always succeed if the path is in use)
-        KProcess::execute(QStringList() << "fusermount" << "-u" << m_mountPoint, 10000);
+        KProcess::execute(QStringList() << QStringLiteral("fusermount") << QStringLiteral("-u") << m_mountPoint, 10000);
+        m_proc = nullptr;
     }
     m_started = false;
 }
-

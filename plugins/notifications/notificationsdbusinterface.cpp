@@ -20,27 +20,23 @@
 
 #include "notificationsdbusinterface.h"
 #include "notification_debug.h"
+#include "notification.h"
 
 #include <QDBusConnection>
 
-#include <KNotification>
-#include <QIcon>
-#include <QCryptographicHash>
-
 #include <core/device.h>
 #include <core/kdeconnectplugin.h>
-#include <core/filetransferjob.h>
 
 #include "notificationsplugin.h"
+#include "sendreplydialog.h"
 
 NotificationsDbusInterface::NotificationsDbusInterface(KdeConnectPlugin* plugin)
     : QDBusAbstractAdaptor(const_cast<Device*>(plugin->device()))
     , mDevice(plugin->device())
     , mPlugin(plugin)
     , mLastId(0)
-    , imagesDir(QDir::temp().absoluteFilePath("kdeconnect"))
 {
-    imagesDir.mkpath(imagesDir.absolutePath());
+
 }
 
 NotificationsDbusInterface::~NotificationsDbusInterface()
@@ -62,13 +58,13 @@ QStringList NotificationsDbusInterface::activeNotifications()
 
 void NotificationsDbusInterface::processPackage(const NetworkPackage& np)
 {
-    if (np.get<bool>("isCancel")) {
-        QString id = np.get<QString>("id");
+    if (np.get<bool>(QStringLiteral("isCancel"))) {
+        QString id = np.get<QString>(QStringLiteral("id"));
         // cut off kdeconnect-android's prefix if there:
-        if (id.startsWith("org.kde.kdeconnect_tp::"))
-            id = id.mid(id.indexOf("::") + 2);
+        if (id.startsWith(QLatin1String("org.kde.kdeconnect_tp::")))
+            id = id.mid(id.indexOf(QLatin1String("::")) + 2);
         removeNotification(id);
-    } else if (np.get<bool>("isRequest")) {
+    } else if (np.get<bool>(QStringLiteral("isRequest"))) {
         Q_FOREACH (const auto& n, mNotifications) {
             NetworkPackage np(PACKAGE_TYPE_NOTIFICATION_REQUEST, {
                 {"id", n->internalId()},
@@ -79,32 +75,18 @@ void NotificationsDbusInterface::processPackage(const NetworkPackage& np)
             });
             mPlugin->sendPackage(np);
         }
+    } else if(np.get<bool>(QStringLiteral("requestAnswer"), false)) {
+
     } else {
+        QString id = np.get<QString>(QStringLiteral("id"));
 
-        //TODO: Uncoment when we are able to display app icon on plasmoid
-        QString destination;
-        /*
-        if (np.hasPayload()) {
-            QString filename = KMD5(np.get<QString>("appName").toLatin1()).hexDigest();  //TODO: Store with extension?
-            destination = imagesDir.absoluteFilePath(filename);
-            FileTransferJob* job = np.createPayloadTransferJob(destination);
-            job->start();
+        if (!mInternalIdToPublicId.contains(id)) {
+            Notification* noti = new Notification(np, this);
+            addNotification(noti);
+        } else {
+            QString pubId = mInternalIdToPublicId[id];
+            mNotifications[pubId]->update(np);
         }
-        */
-
-        Notification* noti = new Notification(np, destination, this);
-
-        //Do not show updates to existent notification nor answers to a initialization request
-        if (!mInternalIdToPublicId.contains(noti->internalId()) && !np.get<bool>("requestAnswer", false) && !np.get<bool>("silent", false)) {
-            KNotification* notification = new KNotification("notification", KNotification::CloseOnTimeout, this);
-            notification->setIconName(QStringLiteral("preferences-desktop-notification"));
-            notification->setComponentName("kdeconnect");
-            notification->setTitle(mDevice->name());
-            notification->setText(noti->appName() + ": " + noti->ticker());
-            notification->sendEvent();
-        }
-
-        addNotification(noti);
     }
 }
 
@@ -120,6 +102,10 @@ void NotificationsDbusInterface::addNotification(Notification* noti)
 
     connect(noti, &Notification::dismissRequested,
             this, &NotificationsDbusInterface::dismissRequested);
+    
+    connect(noti, &Notification::replyRequested, this, [this,noti]{ 
+        replyRequested(noti); 
+    });
 
     const QString& publicId = newId();
     mNotifications[publicId] = noti;
@@ -156,7 +142,7 @@ void NotificationsDbusInterface::removeNotification(const QString& internalId)
 void NotificationsDbusInterface::dismissRequested(const QString& internalId)
 {
     NetworkPackage np(PACKAGE_TYPE_NOTIFICATION_REQUEST);
-    np.set<QString>("cancel", internalId);
+    np.set<QString>(QStringLiteral("cancel"), internalId);
     mPlugin->sendPackage(np);
 
     //Workaround: we erase notifications without waiting a repsonse from the
@@ -164,6 +150,24 @@ void NotificationsDbusInterface::dismissRequested(const QString& internalId)
     //notification no longer exists. Ideally, each time we reach the phone
     //after some time disconnected we should re-sync all the notifications.
     removeNotification(internalId);
+}
+
+void NotificationsDbusInterface::replyRequested(Notification* noti)
+{
+    QString replyId = noti->replyId();
+    QString appName = noti->appName();
+    QString originalMessage = noti->ticker();
+    SendReplyDialog* dialog = new SendReplyDialog(originalMessage, replyId, appName);
+    connect(dialog, &SendReplyDialog::sendReply, this, &NotificationsDbusInterface::sendReply);
+    dialog->show();
+}
+
+void NotificationsDbusInterface::sendReply(const QString& replyId, const QString& message)
+{
+    NetworkPackage np(PACKAGE_TYPE_NOTIFICATION_REPLY);
+    np.set<QString>(QStringLiteral("requestReplyId"), replyId);
+    np.set<QString>(QStringLiteral("message"), message);
+    mPlugin->sendPackage(np);
 }
 
 QString NotificationsDbusInterface::newId()

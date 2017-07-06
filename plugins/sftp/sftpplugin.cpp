@@ -23,6 +23,7 @@
 #include <QDBusConnection>
 #include <QDir>
 #include <QDebug>
+#include <QStandardPaths>
 
 #include <KLocalizedString>
 #include <KNotification>
@@ -37,7 +38,7 @@ K_PLUGIN_FACTORY_WITH_JSON( KdeConnectPluginFactory, "kdeconnect_sftp.json", reg
 
 Q_LOGGING_CATEGORY(KDECONNECT_PLUGIN_SFTP, "kdeconnect.plugin.sftp")
 
-static const QSet<QString> fields_c = QSet<QString>() << "ip" << "port" << "user" << "port" << "path";
+static const QSet<QString> fields_c = QSet<QString>() << QStringLiteral("ip") << QStringLiteral("port") << QStringLiteral("user") << QStringLiteral("port") << QStringLiteral("path");
 
 struct SftpPlugin::Pimpl
 {
@@ -68,7 +69,7 @@ void SftpPlugin::addToDolphin()
 {
     removeFromDolphin();
     QUrl kioUrl("kdeconnect://"+deviceId+"/");
-    m_d->placesModel.addPlace(device()->name(), kioUrl, "kdeconnect");
+    m_d->placesModel.addPlace(device()->name(), kioUrl, QStringLiteral("kdeconnect"));
     qCDebug(KDECONNECT_PLUGIN_SFTP) << "add to dolphin";
 }
 
@@ -82,11 +83,6 @@ void SftpPlugin::removeFromDolphin()
     }
 }
 
-void SftpPlugin::connected()
-{
-    QDBusConnection::sessionBus().registerObject(dbusPath(), this, QDBusConnection::ExportScriptableContents);
-}
-
 void SftpPlugin::mount()
 {
     qCDebug(KDECONNECT_PLUGIN_SFTP) << "Mount device:" << device()->name();
@@ -95,9 +91,9 @@ void SftpPlugin::mount()
     }
 
     m_d->mounter = new Mounter(this);
-    connect(m_d->mounter, SIGNAL(mounted()), this, SLOT(onMounted()));
-    connect(m_d->mounter, SIGNAL(unmounted()), this, SLOT(onUnmounted()));
-    connect(m_d->mounter, SIGNAL(failed(QString)), this, SLOT(onFailed(QString)));
+    connect(m_d->mounter, &Mounter::mounted, this, &SftpPlugin::onMounted);
+    connect(m_d->mounter, &Mounter::unmounted, this, &SftpPlugin::onUnmounted);
+    connect(m_d->mounter, &Mounter::failed, this, &SftpPlugin::onFailed);
 }
 
 void SftpPlugin::unmount()
@@ -139,9 +135,9 @@ bool SftpPlugin::receivePackage(const NetworkPackage& np)
     Q_EMIT packageReceived(np);
 
     remoteDirectories.clear();
-    if (np.has("multiPaths")) {
-        QStringList paths = np.get<QStringList>("multiPaths",QStringList());
-        QStringList names = np.get<QStringList>("pathNames",QStringList());
+    if (np.has(QStringLiteral("multiPaths"))) {
+        QStringList paths = np.get<QStringList>(QStringLiteral("multiPaths"),QStringList());
+        QStringList names = np.get<QStringList>(QStringLiteral("pathNames"),QStringList());
         int size = qMin<int>(names.size(), paths.size());
         for (int i = 0; i < size; i++) {
             remoteDirectories.insert(mountPoint() + paths.at(i), names.at(i));
@@ -156,13 +152,16 @@ bool SftpPlugin::receivePackage(const NetworkPackage& np)
 
 QString SftpPlugin::mountPoint()
 {
-    QDir mountDir = config()->privateDirectory();
-    return mountDir.absoluteFilePath(deviceId);
+    QString runtimePath = QStandardPaths::writableLocation(QStandardPaths::RuntimeLocation);
+    if (runtimePath.isEmpty()) {
+        runtimePath = QStandardPaths::writableLocation(QStandardPaths::TempLocation);
+    }
+    return QDir(runtimePath).absoluteFilePath(deviceId);
 }
 
 void SftpPlugin::onMounted()
 {
-    qCDebug(KDECONNECT_PLUGIN_SFTP) << device()->name() << QString("Remote filesystem mounted at %1").arg(mountPoint());
+    qCDebug(KDECONNECT_PLUGIN_SFTP) << device()->name() << QStringLiteral("Remote filesystem mounted at %1").arg(mountPoint());
 
     Q_EMIT mounted();
 }

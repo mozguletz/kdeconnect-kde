@@ -70,7 +70,7 @@ void TestSslSocketLineReader::initTestCase()
 
     mTimer.setInterval(10 * 1000);//Ten second is more enough for this test, just used this so that to break mLoop if stuck
     mTimer.setSingleShot(true);
-    connect(&mTimer, SIGNAL(timeout()), &mLoop, SLOT(quit()));
+    connect(&mTimer, &QTimer::timeout, &mLoop, &QEventLoop::quit);
 
     mTimer.start();
 }
@@ -79,7 +79,7 @@ void TestSslSocketLineReader::init()
 {
     mClientSocket = new QSslSocket(this);
     mClientSocket->connectToHost(QHostAddress::LocalHost, PORT);
-    connect(mClientSocket, SIGNAL(connected()), &mLoop, SLOT(quit()));
+    connect(mClientSocket, &QAbstractSocket::connected, &mLoop, &QEventLoop::quit);
 
     mLoop.exec();
 
@@ -112,18 +112,18 @@ void TestSslSocketLineReader::testTrustedDevice()
     QVERIFY2(serverSocket != 0, "Null socket returned by server");
     QVERIFY2(serverSocket->isOpen(), "Server socket already closed");
 
-    setSocketAttributes(serverSocket, QString("Test Server"));
-    setSocketAttributes(mClientSocket, QString("Test Client"));
+    setSocketAttributes(serverSocket, QStringLiteral("Test Server"));
+    setSocketAttributes(mClientSocket, QStringLiteral("Test Client"));
 
-    serverSocket->setPeerVerifyName("Test Client");
+    serverSocket->setPeerVerifyName(QStringLiteral("Test Client"));
     serverSocket->setPeerVerifyMode(QSslSocket::VerifyPeer);
     serverSocket->addCaCertificate(mClientSocket->localCertificate());
 
-    mClientSocket->setPeerVerifyName("Test Server");
+    mClientSocket->setPeerVerifyName(QStringLiteral("Test Server"));
     mClientSocket->setPeerVerifyMode(QSslSocket::VerifyPeer);
     mClientSocket->addCaCertificate(serverSocket->localCertificate());
 
-    connect(mClientSocket, SIGNAL(encrypted()), &mLoop, SLOT(quit()));
+    connect(mClientSocket, &QSslSocket::encrypted, &mLoop, &QEventLoop::quit);
     serverSocket->startServerEncryption();
     mClientSocket->startClientEncryption();
     mLoop.exec();
@@ -146,7 +146,7 @@ void TestSslSocketLineReader::testTrustedDevice()
     mPackages.clear();
 
     mReader = new SocketLineReader(serverSocket, this);
-    connect(mReader, SIGNAL(readyRead()), this,SLOT(newPackage()));
+    connect(mReader, &SocketLineReader::readyRead, this,&TestSslSocketLineReader::newPackage);
     mLoop.exec();
 
     /* remove the empty line before compare */
@@ -174,16 +174,16 @@ void TestSslSocketLineReader::testUntrustedDevice()
     QVERIFY2(serverSocket != 0, "Null socket returned by server");
     QVERIFY2(serverSocket->isOpen(), "Server socket already closed");
 
-    setSocketAttributes(serverSocket, QString("Test Server"));
-    setSocketAttributes(mClientSocket, QString("Test Client"));
+    setSocketAttributes(serverSocket, QStringLiteral("Test Server"));
+    setSocketAttributes(mClientSocket, QStringLiteral("Test Client"));
 
-    serverSocket->setPeerVerifyName("Test Client");
+    serverSocket->setPeerVerifyName(QStringLiteral("Test Client"));
     serverSocket->setPeerVerifyMode(QSslSocket::QueryPeer);
 
-    mClientSocket->setPeerVerifyName("Test Server");
+    mClientSocket->setPeerVerifyName(QStringLiteral("Test Server"));
     mClientSocket->setPeerVerifyMode(QSslSocket::QueryPeer);
 
-    connect(mClientSocket, SIGNAL(encrypted()), &mLoop, SLOT(quit()));
+    connect(mClientSocket, &QSslSocket::encrypted, &mLoop, &QEventLoop::quit);
     serverSocket->startServerEncryption();
     mClientSocket->startClientEncryption();
     mLoop.exec();
@@ -205,7 +205,7 @@ void TestSslSocketLineReader::testUntrustedDevice()
     mPackages.clear();
 
     mReader = new SocketLineReader(serverSocket, this);
-    connect(mReader, SIGNAL(readyRead()), SLOT(newPackage()));
+    connect(mReader, &SocketLineReader::readyRead, this, &TestSslSocketLineReader::newPackage);
     mLoop.exec();
 
     /* remove the empty line before compare */
@@ -231,20 +231,20 @@ void TestSslSocketLineReader::testTrustedDeviceWithWrongCertificate()
 
     QVERIFY2(serverSocket != 0, "Could not open a connection to the client");
 
-    setSocketAttributes(serverSocket, QString("Test Server"));
-    setSocketAttributes(mClientSocket, QString("Test Client"));
+    setSocketAttributes(serverSocket, QStringLiteral("Test Server"));
+    setSocketAttributes(mClientSocket, QStringLiteral("Test Client"));
 
     // Not adding other device certificate to list of CA certificate, and using VerifyPeer. This should lead to handshake failure
-    serverSocket->setPeerVerifyName("Test Client");
+    serverSocket->setPeerVerifyName(QStringLiteral("Test Client"));
     serverSocket->setPeerVerifyMode(QSslSocket::VerifyPeer);
 
-    mClientSocket->setPeerVerifyName("Test Server");
+    mClientSocket->setPeerVerifyName(QStringLiteral("Test Server"));
     mClientSocket->setPeerVerifyMode(QSslSocket::VerifyPeer);
 
-    connect(serverSocket, SIGNAL(encrypted()), &mLoop, SLOT(quit())); // Encrypted signal should never be emitted
-    connect(mClientSocket, SIGNAL(encrypted()), &mLoop, SLOT(quit())); // Encrypted signal should never be emitted
-    connect(serverSocket, SIGNAL(disconnected()), &mLoop, SLOT(quit()));
-    connect(mClientSocket, SIGNAL(disconnected()), &mLoop, SLOT(quit()));
+    connect(serverSocket, &QSslSocket::encrypted, &mLoop, &QEventLoop::quit); // Encrypted signal should never be emitted
+    connect(mClientSocket, &QSslSocket::encrypted, &mLoop, &QEventLoop::quit); // Encrypted signal should never be emitted
+    connect(serverSocket, &QAbstractSocket::disconnected, &mLoop, &QEventLoop::quit);
+    connect(mClientSocket, &QAbstractSocket::disconnected, &mLoop, &QEventLoop::quit);
 
     serverSocket->startServerEncryption();
     mClientSocket->startClientEncryption();
@@ -287,8 +287,8 @@ void TestSslSocketLineReader::setSocketAttributes(QSslSocket *socket, QString de
     QDateTime endTime = startTime.addYears(10);
     QCA::CertificateInfo certificateInfo;
     certificateInfo.insert(QCA::CommonName,deviceName);
-    certificateInfo.insert(QCA::Organization,"KDE");
-    certificateInfo.insert(QCA::OrganizationalUnit,"Kde connect");
+    certificateInfo.insert(QCA::Organization,QStringLiteral("KDE"));
+    certificateInfo.insert(QCA::OrganizationalUnit,QStringLiteral("Kde connect"));
 
     QCA::CertificateOptions certificateOptions(QCA::PKCS10);
     certificateOptions.setSerialNumber(10);

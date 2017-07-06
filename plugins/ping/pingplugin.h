@@ -25,7 +25,7 @@
 
 #include <core/kdeconnectplugin.h>
 
-#define PACKAGE_TYPE_PING QLatin1String("kdeconnect.ping")
+#define PACKAGE_TYPE_PING QStringLiteral("kdeconnect.ping")
 
 class Q_DECL_EXPORT PingPlugin
     : public KdeConnectPlugin
@@ -40,12 +40,10 @@ public:
     Q_SCRIPTABLE void sendPing();
     Q_SCRIPTABLE void sendPing(const QString& customMessage);
 
-public Q_SLOTS:
     bool receivePackage(const NetworkPackage& np) override;
-    void connected() override;
+    void connected() override {}
 
-private:
-    QString dbusPath() const;
+    QString dbusPath() const override;
 };
 
 #endif

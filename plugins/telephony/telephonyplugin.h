@@ -28,8 +28,8 @@
 
 #include <core/kdeconnectplugin.h>
 
-#define PACKAGE_TYPE_TELEPHONY_REQUEST QLatin1String("kdeconnect.telephony.request")
-#define PACKAGE_TYPE_SMS_REQUEST QLatin1String("kdeconnect.sms.request")
+#define PACKAGE_TYPE_TELEPHONY_REQUEST QStringLiteral("kdeconnect.telephony.request")
+#define PACKAGE_TYPE_SMS_REQUEST QStringLiteral("kdeconnect.sms.request")
 
 Q_DECLARE_LOGGING_CATEGORY(KDECONNECT_PLUGIN_TELEPHONY)
 
@@ -37,18 +37,20 @@ class TelephonyPlugin
     : public KdeConnectPlugin
 {
     Q_OBJECT
+    Q_CLASSINFO("D-Bus Interface", "org.kde.kdeconnect.device.telephony")
 
 public:
     explicit TelephonyPlugin(QObject *parent, const QVariantList &args);
 
     bool receivePackage(const NetworkPackage& np) override;
-    void connected() override { }
+    void connected() override {}
+    QString dbusPath() const override;
 
 public Q_SLOTS:
-    void sendMutePackage();
+    Q_SCRIPTABLE void sendSms(const QString& phoneNumber, const QString& messageBody);
 
 private Q_SLOTS:
-    void sendSms(const QString& phoneNumber, const QString& messageBody);
+    void sendMutePackage();
     void showSendSmsDialog();
 
 private:

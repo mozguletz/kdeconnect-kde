@@ -42,12 +42,12 @@ SendSmsDialog::SendSmsDialog(const QString& originalMessage, const QString& phon
     layout->addWidget(mTextEdit);
 
     QPushButton* sendButton = new QPushButton(i18n("Send"), this);
-    connect(sendButton, SIGNAL(clicked(bool)), SLOT(sendButtonClicked()));
+    connect(sendButton, &QAbstractButton::clicked, this, &SendSmsDialog::sendButtonClicked);
     layout->addWidget(sendButton);
 
     setLayout(layout);
     setWindowTitle(contactName);
-    setWindowIcon(QIcon::fromTheme("kdeconnect"));
+    setWindowIcon(QIcon::fromTheme(QStringLiteral("kdeconnect")));
     setAttribute(Qt::WA_DeleteOnClose);
 }
 

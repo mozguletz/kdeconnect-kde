@@ -45,10 +45,12 @@ public:
     void processPackage(const NetworkPackage& np);
     void clearNotifications();
     void dismissRequested(const QString& notification);
+    void replyRequested(Notification* noti);
     void addNotification(Notification* noti);
 
 public Q_SLOTS:
     Q_SCRIPTABLE QStringList activeNotifications();
+    Q_SCRIPTABLE void sendReply(const QString& replyId, const QString& message);
 
 Q_SIGNALS:
     Q_SCRIPTABLE void notificationPosted(const QString& publicId);
@@ -65,8 +67,6 @@ private /*attributes*/:
     QHash<QString, Notification*> mNotifications;
     QHash<QString, QString> mInternalIdToPublicId;
     int mLastId;
-    QDir imagesDir;
-
 };
 
 #endif

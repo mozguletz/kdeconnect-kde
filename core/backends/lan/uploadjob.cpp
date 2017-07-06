@@ -34,17 +34,17 @@ UploadJob::UploadJob(const QSharedPointer<QIODevice>& source, const QString& dev
     , mPort(0)
     , mDeviceId(deviceId) // We will use this info if link is on ssl, to send encrypted payload
 {
-    connect(mInput.data(), SIGNAL(readyRead()), this, SLOT(startUploading()));
-    connect(mInput.data(), SIGNAL(aboutToClose()), this, SLOT(aboutToClose()));
+    connect(mInput.data(), &QIODevice::readyRead, this, &UploadJob::startUploading);
+    connect(mInput.data(), &QIODevice::aboutToClose, this, &UploadJob::aboutToClose);
 }
 
 void UploadJob::start()
 {
-    mPort = 1739;
+    mPort = MIN_PORT;
     while (!mServer->listen(QHostAddress::Any, mPort)) {
         mPort++;
-        if (mPort > 1764) { //No ports available?
-            qCWarning(KDECONNECT_CORE) << "Error opening a port in range 1739-1764 for file transfer";
+        if (mPort > MAX_PORT) { //No ports available?
+            qCWarning(KDECONNECT_CORE) << "Error opening a port in range" << MIN_PORT << "-" << MAX_PORT;
             mPort = 0;
             setError(1);
             setErrorText(i18n("Couldn't find an available port"));
@@ -52,7 +52,7 @@ void UploadJob::start()
             return;
         }
     }
-    connect(mServer, SIGNAL(newConnection()), this, SLOT(newConnection()));
+    connect(mServer, &QTcpServer::newConnection, this, &UploadJob::newConnection);
 }
 
 void UploadJob::newConnection()
@@ -64,7 +64,7 @@ void UploadJob::newConnection()
 
     Server* server = qobject_cast<Server*>(sender());
     // FIXME : It is called again when payload sending is finished. Unsolved mystery :(
-    disconnect(mServer, SIGNAL(newConnection()), this, SLOT(newConnection()));
+    disconnect(mServer, &QTcpServer::newConnection, this, &UploadJob::newConnection);
 
     mSocket = server->nextPendingConnection();
     mSocket->setParent(this);

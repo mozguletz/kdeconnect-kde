@@ -49,8 +49,8 @@ RemoteCommandsPlugin::~RemoteCommandsPlugin() = default;
 
 bool RemoteCommandsPlugin::receivePackage(const NetworkPackage& np)
 {
-    if (np.has("commandList")) {
-        setCommands(np.get<QByteArray>("commandList"));
+    if (np.has(QStringLiteral("commandList"))) {
+        setCommands(np.get<QByteArray>(QStringLiteral("commandList")));
         return true;
     }
 
@@ -59,8 +59,6 @@ bool RemoteCommandsPlugin::receivePackage(const NetworkPackage& np)
 
 void RemoteCommandsPlugin::connected()
 {
-    QDBusConnection::sessionBus().registerObject(dbusPath(), this, QDBusConnection::ExportAllContents);
-
     NetworkPackage np(PACKAGE_TYPE_RUNCOMMAND_REQUEST, {{"requestCommandList", true}});
     sendPackage(np);
 }

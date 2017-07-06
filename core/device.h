@@ -41,9 +41,10 @@ class KDECONNECTCORE_EXPORT Device
     Q_PROPERTY(QString name READ name NOTIFY nameChanged)
     Q_PROPERTY(QString iconName READ iconName CONSTANT)
     Q_PROPERTY(QString statusIconName READ statusIconName)
-    Q_PROPERTY(bool isReachable READ isReachable NOTIFY reachableStatusChanged)
+    Q_PROPERTY(bool isReachable READ isReachable NOTIFY reachableChanged)
     Q_PROPERTY(bool isTrusted READ isTrusted NOTIFY trustedChanged)
     Q_PROPERTY(QStringList supportedPlugins READ supportedPlugins NOTIFY pluginsChanged)
+    Q_PROPERTY(bool hasPairingRequests READ hasPairingRequests NOTIFY hasPairingRequestsChanged)
 
 public:
 
@@ -53,11 +54,6 @@ public:
         Laptop,
         Phone,
         Tablet,
-    };
-
-    enum TrustStatus {
-        NotTrusted,
-        Trusted
     };
 
     /**
@@ -118,17 +114,25 @@ public Q_SLOTS:
     Q_SCRIPTABLE void unpair(); //from all links
     Q_SCRIPTABLE void reloadPlugins(); //from kconf
 
+    Q_SCRIPTABLE void acceptPairing();
+    Q_SCRIPTABLE void rejectPairing();
+    Q_SCRIPTABLE bool hasPairingRequests() const;
+
 private Q_SLOTS:
     void privateReceivedPackage(const NetworkPackage& np);
     void linkDestroyed(QObject* o);
     void pairStatusChanged(DeviceLink::PairStatus current);
+    void addPairingRequest(PairingHandler* handler);
+    void removePairingRequest(PairingHandler* handler);
 
 Q_SIGNALS:
     Q_SCRIPTABLE void pluginsChanged();
-    Q_SCRIPTABLE void reachableStatusChanged();
+    Q_SCRIPTABLE void reachableChanged(bool reachable);
     Q_SCRIPTABLE void trustedChanged(bool trusted);
     Q_SCRIPTABLE void pairingError(const QString& error);
     Q_SCRIPTABLE void nameChanged(const QString& name);
+
+    Q_SCRIPTABLE void hasPairingRequestsChanged(bool hasPairingRequests);
 
 private: //Methods
     static DeviceType str2type(const QString &deviceType);
@@ -149,6 +153,7 @@ private: //Fields (TODO: dPointer!)
     //Capabilities stuff
     QMultiMap<QString, KdeConnectPlugin*> m_pluginsByIncomingCapability;
     QSet<QString> m_supportedPlugins;
+    QSet<PairingHandler*> m_pairRequests;
 };
 
 Q_DECLARE_METATYPE(Device*)

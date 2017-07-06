@@ -34,6 +34,7 @@
 #include "interfaces/remotecontrolinterface.h"
 #include "interfaces/lockdeviceinterface.h"
 #include "interfaces/remotecommandsinterface.h"
+#include "interfaces/remotekeyboardinterface.h"
 
 /**
  * Using these "proxy" classes just in case we need to rename the
@@ -51,6 +52,7 @@ public:
 
 Q_SIGNALS:
     void deviceAdded(const QString &id);
+    void pairingRequestsChangedProxy();
 };
 
 class KDECONNECTINTERFACES_EXPORT DeviceDbusInterface
@@ -59,8 +61,10 @@ class KDECONNECTINTERFACES_EXPORT DeviceDbusInterface
     Q_OBJECT
 //  TODO: Workaround because OrgKdeKdeconnectDeviceInterface is not generating
 //  the signals for the properties
+    Q_PROPERTY(bool isReachable READ isReachable NOTIFY reachableChangedProxy)
     Q_PROPERTY(bool isTrusted READ isTrusted NOTIFY trustedChangedProxy)
     Q_PROPERTY(QString name READ name NOTIFY nameChangedProxy)
+    Q_PROPERTY(bool hasPairingRequests READ hasPairingRequests NOTIFY hasPairingRequestsChangedProxy)
 
 public:
     explicit DeviceDbusInterface(const QString& deviceId, QObject* parent = nullptr);
@@ -72,6 +76,8 @@ public:
 Q_SIGNALS:
     void nameChangedProxy(const QString &name);
     void trustedChangedProxy(bool paired);
+    void reachableChangedProxy(bool reachable);
+    void hasPairingRequestsChangedProxy(bool);
 
 private:
     const QString m_id;
@@ -177,5 +183,29 @@ public:
     explicit RemoteCommandsDbusInterface(const QString& deviceId, QObject* parent = nullptr);
     ~RemoteCommandsDbusInterface() override;
 };
+
+class KDECONNECTINTERFACES_EXPORT RemoteKeyboardDbusInterface
+    : public OrgKdeKdeconnectDeviceRemotekeyboardInterface
+{
+    Q_OBJECT
+    Q_PROPERTY(bool remoteState READ remoteState NOTIFY remoteStateChanged)
+public:
+    explicit RemoteKeyboardDbusInterface(const QString& deviceId, QObject* parent = nullptr);
+    ~RemoteKeyboardDbusInterface() override;
+Q_SIGNALS:
+    void remoteStateChanged(bool state);
+};
+
+template <typename T, typename W>
+static void setWhenAvailable(const QDBusPendingReply<T> &pending, W func, QObject* parent)
+{
+    QDBusPendingCallWatcher *watcher = new QDBusPendingCallWatcher(pending, parent);
+    QObject::connect(watcher, &QDBusPendingCallWatcher::finished,
+                    parent, [func](QDBusPendingCallWatcher* watcher) {
+                        watcher->deleteLater();
+                        QDBusPendingReply<T> reply = *watcher;
+                        func(reply.value());
+                    });
+}
 
 #endif

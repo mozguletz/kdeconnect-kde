@@ -1,5 +1,5 @@
 /*
- * Copyright 2013 Albert Vaca <albertvaka@gmail.com>
+ * Copyright 2015 Aleix Pol Gonzalez <aleixpol@kde.org>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as
@@ -18,25 +18,31 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef AUTOCLOSINGQFILE_H
-#define AUTOCLOSINGQFILE_H
+#ifndef DBUSHELPERS_H
+#define DBUSHELPERS_H
 
-#include <QFile>
+#include <QDBusPendingReply>
+#include <QTextStream>
+#include <KLocalizedString>
 
-class AutoClosingQFile : public QFile
+template <typename T>
+Q_REQUIRED_RESULT T blockOnReply(QDBusPendingReply<T> reply)
 {
-    Q_OBJECT
-public:
-
-    explicit AutoClosingQFile(const QString &name);
-    qint64 readData(char* data, qint64 maxlen) override {
-        qint64 read = QFile::readData(data, maxlen);
-        if (read == -1 || read == bytesAvailable()) {
-            close();
-        }
-        return read;
+    reply.waitForFinished();
+    if (reply.isError()) {
+        QTextStream(stderr) << i18n("error: ") << reply.error().message() << endl;
+        exit(1);
     }
-};
+    return reply.value();
+}
 
+void blockOnReply(QDBusPendingReply<void> reply)
+{
+    reply.waitForFinished();
+    if (reply.isError()) {
+        QTextStream(stderr) << i18n("error: ") << reply.error().message() << endl;
+        exit(1);
+    }
+}
 
-#endif // AUTOCLOSINGQFILE_H
+#endif

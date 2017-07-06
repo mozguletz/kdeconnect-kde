@@ -36,15 +36,15 @@ NotificationsModel::NotificationsModel(QObject* parent)
 
     //new ModelTest(this, this);
 
-    connect(this, SIGNAL(rowsInserted(QModelIndex,int,int)),
-            this, SIGNAL(rowsChanged()));
-    connect(this, SIGNAL(rowsRemoved(QModelIndex,int,int)),
-            this, SIGNAL(rowsChanged()));
+    connect(this, &QAbstractItemModel::rowsInserted,
+            this, &NotificationsModel::rowsChanged);
+    connect(this, &QAbstractItemModel::rowsRemoved,
+            this, &NotificationsModel::rowsChanged);
 
-    connect(this, SIGNAL(dataChanged(QModelIndex,QModelIndex)),
-            this, SIGNAL(anyDismissableChanged()));
-    connect(this, SIGNAL(rowsInserted(QModelIndex,int,int)),
-            this, SIGNAL(anyDismissableChanged()));
+    connect(this, &QAbstractItemModel::dataChanged,
+            this, &NotificationsModel::anyDismissableChanged);
+    connect(this, &QAbstractItemModel::rowsInserted,
+            this, &NotificationsModel::anyDismissableChanged);
 
     QDBusServiceWatcher* watcher = new QDBusServiceWatcher(DaemonDbusInterface::activatedService(),
                                                            QDBusConnection::sessionBus(), QDBusServiceWatcher::WatchForOwnerChange, this);
@@ -60,6 +60,8 @@ QHash<int, QByteArray> NotificationsModel::roleNames() const
     names.insert(AppNameModelRole,     "appName");
     names.insert(IdModelRole,          "notificationId");
     names.insert(DismissableModelRole, "dismissable");
+    names.insert(RepliableModelRole, "repliable");
+    names.insert(IconPathModelRole, "appIcon");
     return names;
 }
 
@@ -82,12 +84,12 @@ void NotificationsModel::setDeviceId(const QString& deviceId)
 
     m_dbusInterface = new DeviceNotificationsDbusInterface(deviceId, this);
 
-    connect(m_dbusInterface, SIGNAL(notificationPosted(QString)),
-            this, SLOT(notificationAdded(QString)));
-    connect(m_dbusInterface, SIGNAL(notificationRemoved(QString)),
-            this, SLOT(notificationRemoved(QString)));
-    connect(m_dbusInterface, SIGNAL(allNotificationsRemoved()),
-            this, SLOT(clearNotifications()));
+    connect(m_dbusInterface, &OrgKdeKdeconnectDeviceNotificationsInterface::notificationPosted,
+            this, &NotificationsModel::notificationAdded);
+    connect(m_dbusInterface, &OrgKdeKdeconnectDeviceNotificationsInterface::notificationRemoved,
+            this, &NotificationsModel::notificationRemoved);
+    connect(m_dbusInterface, &OrgKdeKdeconnectDeviceNotificationsInterface::allNotificationsRemoved,
+            this, &NotificationsModel::clearNotifications);
 
     refreshNotificationList();
 
@@ -132,8 +134,8 @@ void NotificationsModel::refreshNotificationList()
     QDBusPendingReply<QStringList> pendingNotificationIds = m_dbusInterface->activeNotifications();
     QDBusPendingCallWatcher *watcher = new QDBusPendingCallWatcher(pendingNotificationIds, this);
 
-    QObject::connect(watcher, SIGNAL(finished(QDBusPendingCallWatcher*)),
-                     this, SLOT(receivedNotifications(QDBusPendingCallWatcher*)));
+    QObject::connect(watcher, &QDBusPendingCallWatcher::finished,
+                     this, &NotificationsModel::receivedNotifications);
 }
 
 void NotificationsModel::receivedNotifications(QDBusPendingCallWatcher* watcher)
@@ -179,7 +181,7 @@ QVariant NotificationsModel::data(const QModelIndex& index, int role) const
     //FIXME: This function gets called lots of times, producing lots of dbus calls. Add a cache?
     switch (role) {
         case IconModelRole:
-            return QIcon::fromTheme("device-notifier");
+            return QIcon::fromTheme(QStringLiteral("device-notifier"));
         case IdModelRole:
             return notification->internalId();
         case NameModelRole:
@@ -192,6 +194,10 @@ QVariant NotificationsModel::data(const QModelIndex& index, int role) const
             return qVariantFromValue<QObject*>(notification);
         case DismissableModelRole:
             return notification->dismissable();
+        case RepliableModelRole:
+            return !notification->replyId().isEmpty();
+        case IconPathModelRole:
+            return notification->iconPath();
         default:
              return QVariant();
     }

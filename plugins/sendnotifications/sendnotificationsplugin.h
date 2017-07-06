@@ -23,7 +23,7 @@
 
 #include "core/kdeconnectplugin.h"
 
-#define PACKAGE_TYPE_NOTIFICATION QLatin1String("kdeconnect.notification")
+#define PACKAGE_TYPE_NOTIFICATION QStringLiteral("kdeconnect.notification")
 
 /*
  * This class is just a proxy for NotificationsDbusInterface
@@ -42,7 +42,6 @@ public:
     explicit SendNotificationsPlugin(QObject *parent, const QVariantList &args);
     ~SendNotificationsPlugin() override;
     
-public Q_SLOTS:
     bool receivePackage(const NetworkPackage& np) override;
     void connected() override;
 

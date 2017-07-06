@@ -25,7 +25,7 @@
 
 #include <core/kdeconnectplugin.h>
 
-#define PACKAGE_TYPE_MOUSEPAD_REQUEST QLatin1String("kdeconnect.mousepad.request")
+#define PACKAGE_TYPE_MOUSEPAD_REQUEST QStringLiteral("kdeconnect.mousepad.request")
 
 class Q_DECL_EXPORT RemoteControlPlugin
     : public KdeConnectPlugin
@@ -38,13 +38,11 @@ public:
     ~RemoteControlPlugin() override;
 
     bool receivePackage(const NetworkPackage& /*np*/) override { return false; }
-    void connected() override;
+    void connected() override {}
+    QString dbusPath() const override;
 
-    Q_INVOKABLE void moveCursor(const QPoint &p);
-    Q_INVOKABLE void sendCommand(const QString &name, bool val);
-
-private:
-    QString dbusPath() const;
+    Q_SCRIPTABLE void moveCursor(const QPoint &p);
+    Q_SCRIPTABLE void sendCommand(const QString &name, bool val);
 };
 
 #endif

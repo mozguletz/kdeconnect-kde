@@ -49,6 +49,7 @@ public:
 
     virtual void packageReceived(const NetworkPackage& np) = 0;
     virtual void unpair() = 0;
+    static int pairingTimeoutMsec() { return 30 * 1000; } // 30 seconds of timeout (default), subclasses that use different values should override
 
 public Q_SLOTS:
     virtual bool requestPairing() = 0;

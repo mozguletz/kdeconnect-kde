@@ -44,7 +44,7 @@ public:
     LanLinkProvider(bool testMode = false);
     ~LanLinkProvider() override;
 
-    QString name() override { return "LanLinkProvider"; }
+    QString name() override { return QStringLiteral("LanLinkProvider"); }
     int priority() override { return PRIORITY_HIGH; }
 
     void userRequestsPair(const QString &deviceId);
@@ -54,7 +54,9 @@ public:
     static void configureSslSocket(QSslSocket* socket, const QString& deviceId, bool isDeviceTrusted);
     static void configureSocket(QSslSocket* socket);
 
-    const static quint16 PORT = 1716;
+    const static quint16 UDP_PORT = 1716;
+    const static quint16 MIN_TCP_PORT = 1716;
+    const static quint16 MAX_TCP_PORT = 1764;
 
 public Q_SLOTS:
     void onNetworkChange() override;

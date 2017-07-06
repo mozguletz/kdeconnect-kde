@@ -39,14 +39,14 @@ LanDeviceLink::LanDeviceLink(const QString& deviceId, LinkProvider* parent, QSsl
 void LanDeviceLink::reset(QSslSocket* socket, ConnectionStarted connectionSource)
 {
     if (mSocketLineReader) {
-        disconnect(mSocketLineReader->mSocket, SIGNAL(disconnected()), this, SLOT(deleteLater()));
+        disconnect(mSocketLineReader->mSocket, &QAbstractSocket::disconnected, this, &QObject::deleteLater);
         delete mSocketLineReader;
     }
 
     mSocketLineReader = new SocketLineReader(socket, this);
 
-    connect(socket, SIGNAL(disconnected()), this, SLOT(deleteLater()));
-    connect(mSocketLineReader, SIGNAL(readyRead()), this, SLOT(dataReceived()));
+    connect(socket, &QAbstractSocket::disconnected, this, &QObject::deleteLater);
+    connect(mSocketLineReader, &SocketLineReader::readyRead, this, &LanDeviceLink::dataReceived);
 
     //We take ownership of the socket.
     //When the link provider destroys us,
@@ -56,13 +56,13 @@ void LanDeviceLink::reset(QSslSocket* socket, ConnectionStarted connectionSource
 
     mConnectionSource = connectionSource;
 
-    QString certString = KdeConnectConfig::instance()->getDeviceProperty(deviceId(), "certificate");
+    QString certString = KdeConnectConfig::instance()->getDeviceProperty(deviceId(), QStringLiteral("certificate"));
     DeviceLink::setPairStatus(certString.isEmpty()? PairStatus::NotPaired : PairStatus::Paired);
 }
 
 QString LanDeviceLink::name()
 {
-    return "LanLink"; // Should be same in both android and kde version
+    return QStringLiteral("LanLink"); // Should be same in both android and kde version
 }
 
 bool LanDeviceLink::sendPackage(NetworkPackage& np)
@@ -106,8 +106,8 @@ void LanDeviceLink::dataReceived()
         //qCDebug(KDECONNECT_CORE) << "HasPayloadTransferInfo";
         QVariantMap transferInfo = package.payloadTransferInfo();
         //FIXME: The next two lines shouldn't be needed! Why are they here?
-        transferInfo.insert("useSsl", true);
-        transferInfo.insert("deviceId", deviceId());
+        transferInfo.insert(QStringLiteral("useSsl"), true);
+        transferInfo.insert(QStringLiteral("deviceId"), deviceId());
         DownloadJob* job = new DownloadJob(mSocketLineReader->peerAddress(), transferInfo);
         job->start();
         package.setPayload(job->getPayload(), package.payloadSize());
@@ -146,7 +146,7 @@ void LanDeviceLink::setPairStatus(PairStatus status)
     if (status == Paired) {
         Q_ASSERT(KdeConnectConfig::instance()->trustedDevices().contains(deviceId()));
         Q_ASSERT(!mSocketLineReader->peerCertificate().isNull());
-        KdeConnectConfig::instance()->setDeviceProperty(deviceId(), "certificate", mSocketLineReader->peerCertificate().toPem());
+        KdeConnectConfig::instance()->setDeviceProperty(deviceId(), QStringLiteral("certificate"), mSocketLineReader->peerCertificate().toPem());
     }
 }
 
